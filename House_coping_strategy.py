@@ -65,11 +65,40 @@ def consuption_graph():
 
 ##################################################
 
+def food_consumption_score_table():
+    df = pd.read_excel("./DFNSD_data/Household Coping Straregies.xlsx", sheet_name = 'fcs')
+    df = df.groupby(['Year','Province'])['Poor', 'Borderline','Acceptable'].sum()
+    df = df.reset_index()
+    fig = go.Figure(data=[go.Table(
+    header=dict(values=list(df.columns),
+                fill_color='paleturquoise',
+                align='left'),
+    cells=dict(values=[df.Year, df.Province, df.Poor.round(), df.Borderline.round(), df.Acceptable.round()],
+               fill_color='lavender',
+               align='left'))
+    ])
+    fig.update_layout(
+        title = {
+            'text' : "<b>FOOD CONSUMPTION SCORE TABLE</b>",
+            'y' : 0.9,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top'},
+        title_font_color="red",
+        title_font_size=12,
+        xaxis_title='Year',
+        yaxis_title='Food Consumption Score',
+        autosize = True,
+        width = 700,
+        height = 400)
+    return(dcc.Graph(
+        id='fcs-table',
+        figure = fig
+    ))
 
 #data modeling
-df = pd.read_excel("./DFNSD_data/RLA FS Trends.xlsx", sheet_name = 'District Food Insecurity')
-del df['DistPCode']
-years = list(df.columns)[1:]
+df = pd.read_excel("./DFNSD_data/Household Coping Straregies.xlsx", sheet_name = 'fcs')
+district = list(df['District'].drop_duplicates())
 
 ############
 df1 = pd.read_excel("./DFNSD_data/Household Coping Straregies.xlsx", sheet_name = 'HDDS')
@@ -86,9 +115,9 @@ app.layout = dbc.Jumbotron(
             dbc.Col( md=6),
             dbc.Col(html.Div([
                 dcc.Dropdown(
-                id='year-select',
-                options=[{'label': i, 'value': i} for i in years],
-                value='FS_2016-17'
+                id='district-select',
+                options=[{'label': i, 'value': i} for i in district],
+                value='Gutu'
                 )
                 ],style={'width': '48%', 'float': 'right', 'display': 'inline-block'}
                 ), 
@@ -103,7 +132,7 @@ app.layout = dbc.Jumbotron(
             [
                 
                 dbc.Col(consuption_graph(), md=6),
-                dbc.Col(dcc.Graph(id='indicator-graphic'), md=6)
+                dbc.Col(dcc.Graph(id='food_score-graphic'), md=6)
             ],
             align="center",
         ),
@@ -131,7 +160,8 @@ app.layout = dbc.Jumbotron(
         ,
         dbc.Row(
             [
-                dbc.Col(dcc.Graph(id='household-graphic'), md=6)
+                dbc.Col(dcc.Graph(id='household-graphic'), md=6),
+                dbc.Col(food_consumption_score_table(), md=6)
             ],
             align="center",
         )
@@ -143,24 +173,42 @@ app.layout = dbc.Jumbotron(
 
 
 @app.callback(
-    Output('indicator-graphic', 'figure'),
-    Input('year-select', 'value')
+    Output('food_score-graphic', 'figure'),
+    Input('district-select', 'value')
 )  
-def analysis_graph(year_value):
-    if year_value == None:
-        year_value = "FS_2016-17"
-    top5_2016 = df.sort_values(by=year_value, ascending= False)
-    bottom5 = df.sort_values(by=year_value, ascending= True)
-    top5_2016 = top5_2016[:5][['District_Name',year_value]]
-    bottom5 = bottom5[:5][['District_Name',year_value]]
+def analysis_graph(district_value):
+    df = pd.read_excel("./DFNSD_data/Household Coping Straregies.xlsx", sheet_name = 'fcs')
+    if district_value == None:
+        district_value = "Gutu"
+    df = df[df['District']==district_value]
+    cols = list(df.columns[3:6])
+    df[cols] = df[cols].round()
+    x = list(df['Year'])
+    y1 = list(df['Poor'])
+    y2 = list(df['Borderline'])
+    y3 = list(df['Acceptable'])
 
-    fig = px.bar(top5_2016, x=top5_2016["District_Name"], y=top5_2016[year_value],
-             labels=dict(x="District_Name", y="Value"))
-    fig.add_bar(x=bottom5["District_Name"], y=bottom5[year_value], name="Bottom5")
-    fig.update_layout(title = {'text' : "Top 5 vs Bottom 5",'y' : 0.9,'x': 0.5,
-            'xanchor': 'center','yanchor': 'top'},xaxis_title='District Name', yaxis_title='Insecurity',
-            barmode='group',autosize = True,width = 700,height = 400)
+    fig = go.Figure()
+    for col in df.columns[3:-1]:
+        fig.add_trace(go.Bar(x=df.Year, y=df[col].values,
+                                 name = col))
+    # format and show figure
+    fig.update_layout(
+        title = {
+            'text' : f"<b>FOOD CONSUMPTION SCORE FOR {district_value} district</b>".upper(),
+            'y' : 0.9,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top'},
+        title_font_color="red",
+        title_font_size=12,
+        xaxis_title='Year',
+        yaxis_title='Food Consumption Score',
+        autosize = True,
+        width = 620,
+        height = 400)
     return fig
+
 
 ############################################################
 #household_graph
@@ -196,4 +244,4 @@ def analysis_graph(province_value, consyear_value):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True, port = 8052)
+    app.run_server(debug=True, port = 8051)
